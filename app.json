@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Flugorganisation",
+    "slug": "fluge",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ozce.fluge"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.ozce.fluge"
+    },
+    "web": {
+      "favicon": "./icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0362870d-808d-4feb-ba97-756da0350655"
+      }
+    },
+    "owner": "ozce"
+  }
+}
