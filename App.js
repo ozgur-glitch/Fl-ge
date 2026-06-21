@@ -1,76 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
+import { 
+  StyleSheet, 
+  Text, 
+  View, 
+  TextInput, 
+  TouchableOpacity, 
+  ScrollView, 
+  SafeAreaView, 
   Modal,
   Alert,
   StatusBar,
   Switch,
-  Clipboard
+  Clipboard,
+  ActivityIndicator
 } from 'react-native';
 
-// Trickst den Online-Compiler aus, damit er wegen fehlender Pakete nicht abbricht
-let AsyncStorage = null;
-try {
-  // Versteckter Import, den der Metro-Bundler beim Build ignoriert
-  AsyncStorage = require('@react-native-async-storage/async-storage').default || require('@react-native-async-storage/async-storage');
-} catch (e) {
-  // Ignorieren, falls im Web oder während der ersten Buildphase nicht verfügbar
-}
-
-const robustStorage = {
-  getItem: async (key) => {
-    try {
-      if (AsyncStorage && typeof AsyncStorage.getItem === 'function') {
-        const value = await AsyncStorage.getItem(key);
-        if (value !== null) return value;
-      }
-    } catch (e) {}
-
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
-      }
-    } catch (err) {}
-    return null;
-  },
-  setItem: async (key, value) => {
-    try {
-      if (AsyncStorage && typeof AsyncStorage.setItem === 'function') {
-        await AsyncStorage.setItem(key, value);
-        return;
-      }
-    } catch (e) {}
-
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
-      }
-    } catch (err) {}
-  }
-};
-
-const storage = robustStorage;
+// Speicher-Schlüssel definieren
+const STORAGE_KEY_FLIGHTS = 'flight_organizer_flights';
+const STORAGE_KEY_SCHEDULES = 'flight_organizer_schedules';
 
 // ==========================================
 // DEINE MANUELLE FARBLISTE (HIER ANPASSEN!)
 // ==========================================
 const AIRLINE_COLORS = {
   light: {
-    'LH': '#dc2626', // Lufthansa -> Rot
-    'SQ': '#059669', // Singapore Airlines -> Grün
-    'AI': '#2563eb', // Air India -> Blau
-    'AC': '#ea580c', // Air Canada -> Orange
-    'ET': '#d97706', // Ethiopian -> Gelb/Braun
-    'K+': '#9333ea', // K+N -> Lila
-    'LA': '#db2777', // LATAM -> Pink
-    'AH': '#4b5563', // Air Algérie -> Grau
-    'UC': '#0d9488', // Ladeco -> Türkis
+    'LH': '#dc2626',   // Lufthansa -> Rot
+    'SQ': '#059669',   // Singapore Airlines -> Grün
+    'AI': '#2563eb',   // Air India -> Blau
+    'AC': '#ea580c',   // Air Canada -> Orange
+    'ET': '#d97706',   // Ethiopian -> Gelb/Braun
+    'K+': '#9333ea',   // K+N -> Lila
+    'LA': '#db2777',   // LATAM -> Pink
+    'AH': '#4b5563',   // Air Algérie -> Grau
+    'UC': '#0d9488',   // Ladeco -> Türkis
   },
   dark: {
     'LH': '#f87171',
@@ -108,9 +70,9 @@ export default function App() {
   const [schedules, setSchedules] = useState([]);
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState(null);
-
+  
   // Sortierungs- & Filter-States für Flugplan
-  const [scheduleSortBy, setScheduleSortBy] = useState('startDate');
+  const [scheduleSortBy, setScheduleSortBy] = useState('startDate'); 
   const [hideCompletedSchedules, setHideCompletedSchedules] = useState(false);
 
   // Formular-States für Flugplan
@@ -119,8 +81,8 @@ export default function App() {
   const [schedEndDate, setSchedEndDate] = useState('');
   const [schedSTD, setSchedSTD] = useState('');
   const [schedSTA, setSchedSTA] = useState('');
-  const [schedDays, setSchedDays] = useState([]);
-  const [schedStatus, setSchedStatus] = useState('active');
+  const [schedDays, setSchedDays] = useState([]); 
+  const [schedStatus, setSchedStatus] = useState('active'); 
 
   // Sonstige States
   const [backupModalVisible, setBackupModalVisible] = useState(false);
@@ -136,6 +98,9 @@ export default function App() {
   const [flightInfo, setFlightInfo] = useState('');
   const [flightStatus, setFlightStatus] = useState('active');
 
+  // Lade-Status beim App-Start
+  const [isLoading, setIsLoading] = useState(true);
+
   // Refs
   const filterEndRef = useRef(null);
   const flightNumberRef = useRef(null);
@@ -146,45 +111,45 @@ export default function App() {
   const schedSTARef = useRef(null);
 
   // ==========================================
-  // PERSISTENZ LOGIKEN (LOAD / SAVE)
+  // LOCALSTORAGE LOGIK (INSTALLATIONSFREI)
   // ==========================================
+
+  // Daten beim Start aus dem Browser-Speicher des Handys laden
   useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
     try {
-      const storedFlights = await storage.getItem('@flights_storage_key');
-      const storedSchedules = await storage.getItem('@schedules_storage_key');
-      const storedDarkMode = await storage.getItem('@darkmode_storage_key');
-
-      if (storedFlights) {
-        setFlights(JSON.parse(storedFlights));
-      }
-      if (storedSchedules) {
-        setSchedules(JSON.parse(storedSchedules));
-      }
-      if (storedDarkMode !== null && storedDarkMode !== undefined) {
-        setIsDarkMode(JSON.parse(storedDarkMode) === true);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const storedFlights = localStorage.getItem(STORAGE_KEY_FLIGHTS);
+        const storedSchedules = localStorage.getItem(STORAGE_KEY_SCHEDULES);
+        
+        if (storedFlights) setFlights(JSON.parse(storedFlights));
+        if (storedSchedules) setSchedules(JSON.parse(storedSchedules));
       }
     } catch (error) {
-      console.log('Fehler beim Laden:', error);
+      console.log("Speicher konnte nicht geladen werden", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Helfer zum Sichern der Flüge
+  const saveFlightsToStorage = (updatedFlights) => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(STORAGE_KEY_FLIGHTS, JSON.stringify(updatedFlights));
+      }
+    } catch (error) {
+      Alert.alert("Fehler", "Speichern fehlgeschlagen.");
     }
   };
 
-  const saveData = async (updatedFlights, updatedSchedules, updatedDarkMode) => {
+  // Helfer zum Sichern des Flugplans
+  const saveSchedulesToStorage = (updatedSchedules) => {
     try {
-      if (updatedFlights !== undefined && updatedFlights !== null) {
-        await storage.setItem('@flights_storage_key', JSON.stringify(updatedFlights));
-      }
-      if (updatedSchedules !== undefined && updatedSchedules !== null) {
-        await storage.setItem('@schedules_storage_key', JSON.stringify(updatedSchedules));
-      }
-      if (updatedDarkMode !== undefined && updatedDarkMode !== null) {
-        await storage.setItem('@darkmode_storage_key', JSON.stringify(updatedDarkMode));
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(updatedSchedules));
       }
     } catch (error) {
-      console.log('Fehler beim Speichern:', error);
+      Alert.alert("Fehler", "Speichern fehlgeschlagen.");
     }
   };
 
@@ -209,11 +174,8 @@ export default function App() {
   const formatFormatDate = (text, nextRef) => {
     const cleaned = text.replace(/[^0-9]/g, '');
     let formatted = cleaned;
-    if (cleaned.length > 2 && cleaned.length <= 4) {
-      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
-    } else if (cleaned.length > 4) {
-      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2, 4)}.${cleaned.slice(4, 8)}`;
-    }
+    if (cleaned.length > 2 && cleaned.length <= 4) formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
+    else if (cleaned.length > 4) formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2, 4)}.${cleaned.slice(4, 8)}`;
     if (cleaned.length === 8 && nextRef) nextRef.current?.focus();
     return formatted;
   };
@@ -253,17 +215,17 @@ export default function App() {
       if (parsed.flights || parsed.schedules) {
         if (parsed.flights) {
           setFlights(parsed.flights);
-          saveData(parsed.flights, undefined, undefined);
+          saveFlightsToStorage(parsed.flights);
         }
         if (parsed.schedules) {
           setSchedules(parsed.schedules);
-          saveData(undefined, parsed.schedules, undefined);
+          saveSchedulesToStorage(parsed.schedules);
         }
         setBackupModalVisible(false);
         Alert.alert("Erfolgreich", "Daten wurden erfolgreich geladen!");
       } else if (Array.isArray(parsed)) {
         setFlights(parsed);
-        saveData(parsed, undefined, undefined);
+        saveFlightsToStorage(parsed);
         setBackupModalVisible(false);
         Alert.alert("Erfolgreich", "Ad-Hoc Flüge importiert!");
       } else {
@@ -283,15 +245,17 @@ export default function App() {
       return;
     }
     let updatedFlights;
-    const finalInfo = flightInfo.trim() || "Keine Zusatzinfos";
+    const finalInfo = flightInfo.trim() || "Keine Zusatzinfos"; 
     if (editingFlightId) {
       updatedFlights = flights.map(f => f.id === editingFlightId ? { ...f, date: flightDate, flightNumber, info: finalInfo, status: flightStatus } : f);
     } else {
       updatedFlights = [...flights, { id: Date.now().toString(), date: flightDate, flightNumber, info: finalInfo, status: flightStatus, timestamp: Date.now() }];
     }
     updatedFlights.sort((a, b) => parseDateString(b.date).getTime() - parseDateString(a.date).getTime());
+    
     setFlights(updatedFlights);
-    saveData(updatedFlights, undefined, undefined);
+    saveFlightsToStorage(updatedFlights);
+    
     setFlightDate(''); setFlightNumber(''); setFlightInfo(''); setFlightStatus('active'); setEditingFlightId(null); setModalVisible(false);
   };
 
@@ -301,7 +265,7 @@ export default function App() {
       { text: "Löschen", onPress: () => {
           const updated = flights.filter(f => f.id !== flight.id);
           setFlights(updated);
-          saveData(updated, undefined, undefined);
+          saveFlightsToStorage(updated);
         }, style: "destructive" }
     ]);
   };
@@ -352,8 +316,10 @@ export default function App() {
       timestamp: Date.now()
     };
     let updatedSchedules = editingScheduleId ? schedules.map(s => s.id === editingScheduleId ? newSchedule : s) : [...schedules, newSchedule];
+    
     setSchedules(updatedSchedules);
-    saveData(undefined, updatedSchedules, undefined);
+    saveSchedulesToStorage(updatedSchedules);
+
     setSchedFlightNumber(''); setSchedStartDate(''); setSchedEndDate('');
     setSchedSTD(''); setSchedSTA(''); setSchedDays([]); setSchedStatus('active');
     setEditingScheduleId(null); setScheduleModalVisible(false);
@@ -372,7 +338,7 @@ export default function App() {
       { text: "Löschen", onPress: () => {
           const updated = schedules.filter(s => s.id !== schedule.id);
           setSchedules(updated);
-          saveData(undefined, updated, undefined);
+          saveSchedulesToStorage(updated);
         }, style: "destructive" }
     ]);
   };
@@ -380,7 +346,7 @@ export default function App() {
   const getProcessedSchedules = () => {
     let result = [...schedules];
     if (hideCompletedSchedules) result = result.filter(s => s.status !== 'completed');
-
+    
     result.sort((a, b) => {
       if (scheduleSortBy === 'flightNumber') {
         const numA = (a.flightNumber || '').toUpperCase();
@@ -389,16 +355,16 @@ export default function App() {
       } else {
         const timeA = parseDateString(scheduleSortBy === 'startDate' ? a.startDate : a.endDate).getTime();
         const timeB = parseDateString(scheduleSortBy === 'startDate' ? b.startDate : b.endDate).getTime();
-        return timeB - timeA;
+        return timeB - timeA; 
       }
     });
     return result;
   };
 
   const getStatusBackgroundColor = (status) => {
-    if (status === 'partial') return isDarkMode ? '#7c2d12' : '#ffedd5';
-    if (status === 'completed') return isDarkMode ? '#064e3b' : '#dcfce7';
-    return isDarkMode ? '#1e293b' : '#ffffff';
+    if (status === 'partial') return isDarkMode ? '#7c2d12' : '#ffedd5';   
+    if (status === 'completed') return isDarkMode ? '#064e3b' : '#dcfce7'; 
+    return isDarkMode ? '#1e293b' : '#ffffff';                             
   };
 
   const themeContainer = isDarkMode ? styles.darkContainer : styles.lightContainer;
@@ -408,10 +374,19 @@ export default function App() {
   const themeInput = isDarkMode ? styles.darkInput : styles.lightInput;
   const themePanel = isDarkMode ? styles.darkPanel : styles.lightPanel;
 
+  // Ladebildschirm während des Lesens der Daten
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, themeContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={isDarkMode ? "#3b82f6" : "#1e3a8a"} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[styles.container, themeContainer]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
-
+      
       <View style={[styles.header, isDarkMode && styles.darkHeader]}>
         <Text style={styles.headerTitle}>Flugorganisation</Text>
       </View>
@@ -433,7 +408,7 @@ export default function App() {
       {activeTab === 'flights' && (
         <>
           <View style={[styles.filterContainer, themePanel]}>
-            <TextInput
+            <TextInput 
               style={[styles.searchBar, themeInput]}
               placeholder="Flugnummer oder Text suchen..."
               placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'}
@@ -508,10 +483,10 @@ export default function App() {
                 const airlineColor = getAirlineColor(item.flightNumber);
                 const cardBgColor = getStatusBackgroundColor(item.status);
                 return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[styles.flightCard, themeCard, { borderLeftColor: airlineColor, backgroundColor: cardBgColor }]}
-                    onPress={() => startEditSchedule(item)}
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={[styles.flightCard, themeCard, { borderLeftColor: airlineColor, backgroundColor: cardBgColor }]} 
+                    onPress={() => startEditSchedule(item)} 
                     activeOpacity={0.7}
                   >
                     <View style={styles.cardContent}>
@@ -547,10 +522,7 @@ export default function App() {
 
           <View style={[styles.settingsSection, styles.rowSection, themePanel]}>
             <View><Text style={[styles.sectionTitle, themeText, { marginBottom: 2 }]}>Darkmodus</Text><Text style={[styles.infoLabel, themeSubText]}>Dunkles Design aktivieren</Text></View>
-            <Switch value={isDarkMode} onValueChange={(val) => {
-              setIsDarkMode(val);
-              saveData(undefined, undefined, val);
-            }} trackColor={{ false: '#d1d5db', true: '#3b82f6' }} />
+            <Switch value={isDarkMode} onValueChange={setIsDarkMode} trackColor={{ false: '#d1d5db', true: '#3b82f6' }} />
           </View>
 
           <View style={[styles.settingsSection, themePanel]}>
@@ -574,7 +546,7 @@ export default function App() {
             <TextInput ref={flightNumberRef} style={[styles.input, themeInput]} placeholder="z.B. LH456" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} autoCapitalize="characters" value={flightNumber} onChangeText={setFlightNumber} onSubmitEditing={() => flightInfoRef.current?.focus()} />
             <Text style={[styles.inputLabel, themeText]}>Infos:</Text>
             <TextInput ref={flightInfoRef} style={[styles.input, themeInput]} placeholder="Optional" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} value={flightInfo} onChangeText={setFlightInfo} />
-
+            
             <Text style={[styles.inputLabel, themeText, { marginTop: 8 }]}>Flug Status:</Text>
             <View style={styles.statusRow}>
               <TouchableOpacity style={[styles.statusBtn, flightStatus === 'active' && styles.statusBtnActiveActive]} onPress={() => setFlightStatus('active')}><Text style={[styles.statusBtnText, flightStatus === 'active' && styles.statusBtnTextActive]}>Aktiv</Text></TouchableOpacity>
@@ -602,7 +574,7 @@ export default function App() {
               <TextInput ref={schedStartDateRef} style={[styles.input, themeInput]} placeholder="z.B. 01042026" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={schedStartDate} onChangeText={(text) => setSchedStartDate(formatFormatDate(text, schedEndDateRef))} />
               <Text style={[styles.inputLabel, themeText]}>Enddatum (TTMMJJJJ):</Text>
               <TextInput ref={schedEndDateRef} style={[styles.input, themeInput]} placeholder="z.B. 25102026" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={schedEndDate} onChangeText={(text) => setSchedEndDate(formatFormatDate(text, schedSTARef))} />
-
+              
               <View style={styles.filterInputRow}>
                 <View style={{ width: '48%' }}>
                   <Text style={[styles.inputLabel, themeText]}>STA (Ankunft HHMM):</Text>
@@ -701,15 +673,8 @@ const styles = StyleSheet.create({
   flightNumberText: { fontSize: 16, fontWeight: 'bold', width: 90 },
   flightDateText: { fontSize: 13 },
   timeTextDisplay: { fontSize: 14, fontWeight: '600' },
-  daysWrapper: {
-    width: 120,
-    alignItems: 'flex-end',
-    justifyContent: 'center'
-  },
-  weeksDisplay: {
-    fontSize: 13,
-    textAlign: 'right'
-  },
+  daysWrapper: { width: 120, alignItems: 'flex-end', justifyContent: 'center' },
+  weeksDisplay: { fontSize: 13, textAlign: 'right' },
   detailText: { fontSize: 13 },
   miniDeleteButton: { padding: 6 },
   miniDeleteButtonText: { fontSize: 22, color: '#9ca3af', fontWeight: '300' },
