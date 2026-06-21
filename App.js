@@ -14,59 +14,93 @@ import {
   Clipboard 
 } from 'react-native';
 
+// ==========================================
+// DEINE MANUELLE FARBLISTE (HIER ANPASSEN!)
+// ==========================================
+const AIRLINE_COLORS = {
+  light: {
+    'LH': '#dc2626',   // Lufthansa -> Rot
+    'SQ': '#059669',   // Singapore Airlines -> Grün
+    'AI': '#2563eb',   // Air India -> Blau
+    'AC': '#ea580c',   // Air Canada -> Orange
+    'ET': '#d97706',   // Ethiopian -> Gelb/Braun
+    'K+': '#9333ea',   // K+N -> Lila
+    'LA': '#db2777',   // LATAM -> Pink
+    'AH': '#4b5563',   // Air Algérie -> Grau
+    'UC': '#0d9488',   // Ladeco -> Türkis
+  },
+  dark: {
+    'LH': '#f87171',
+    'SQ': '#34d399',
+    'AI': '#60a5fa',
+    'AC': '#fb923c',
+    'ET': '#fbbf24',
+    'K+': '#c084fc',
+    'LA': '#f472b6',
+    'AH': '#9ca3af',
+    'UC': '#2dd4bf',
+  }
+};
+
+const WEEKDAYS = [
+  { id: 1, label: '1' },
+  { id: 2, label: '2' },
+  { id: 3, label: '3' },
+  { id: 4, label: '4' },
+  { id: 5, label: '5' },
+  { id: 6, label: '6' },
+  { id: 7, label: '7' },
+];
+
 export default function App() {
-  // Navigation State ('flights' oder 'settings')
   const [activeTab, setActiveTab] = useState('flights');
 
-  // Haupt-States
+  // Ad-Hoc-Flüge States
   const [flights, setFlights] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingFlightId, setEditingFlightId] = useState(null);
+  const [hideCompletedFlights, setHideCompletedFlights] = useState(false);
+
+  // Flugplan States
+  const [schedules, setSchedules] = useState([]);
+  const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState(null);
   
-  // Backup-Modal State
+  // Sortierungs- & Filter-States für Flugplan
+  const [scheduleSortBy, setScheduleSortBy] = useState('startDate'); 
+  const [hideCompletedSchedules, setHideCompletedSchedules] = useState(false);
+
+  // Formular-States für Flugplan
+  const [schedFlightNumber, setSchedFlightNumber] = useState('');
+  const [schedStartDate, setSchedStartDate] = useState('');
+  const [schedEndDate, setSchedEndDate] = useState('');
+  const [schedSTD, setSchedSTD] = useState('');
+  const [schedSTA, setSchedSTA] = useState('');
+  const [schedDays, setSchedDays] = useState([]); 
+  const [schedStatus, setSchedStatus] = useState('active'); 
+
+  // Sonstige States
   const [backupModalVisible, setBackupModalVisible] = useState(false);
   const [backupInputText, setBackupInputText] = useState('');
-
-  // Einstellungs-States
   const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // Filter-States
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Formular-States
+  // Formular-States für Ad-Hoc
   const [flightDate, setFlightDate] = useState('');
   const [flightNumber, setFlightNumber] = useState('');
   const [flightInfo, setFlightInfo] = useState('');
+  const [flightStatus, setFlightStatus] = useState('active');
 
-  // Refs für Auto-Fokus / Loop
+  // Refs
   const filterEndRef = useRef(null);
   const flightNumberRef = useRef(null);
   const flightInfoRef = useRef(null);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const savedFlights = []; 
-      if (savedFlights && savedFlights.length > 0) {
-        setFlights(savedFlights);
-      }
-    } catch (error) {
-      Alert.alert("Fehler", "Daten konnten nicht geladen werden.");
-    }
-  };
-
-  const saveData = async (updatedFlights) => {
-    try {
-      setFlights(updatedFlights);
-    } catch (error) {
-      Alert.alert("Fehler", "Daten konnten nicht gespeichert werden.");
-    }
-  };
+  const schedStartDateRef = useRef(null);
+  const schedEndDateRef = useRef(null);
+  const schedSTDRef = useRef(null);
+  const schedSTARef = useRef(null);
 
   const parseDateString = (dateStr) => {
     if (!dateStr || dateStr.length !== 10) return new Date(0);
@@ -74,65 +108,50 @@ export default function App() {
     return new Date(year, month - 1, day);
   };
 
-  // 1) NEUER ALGORITHMUS: Feste Zuweisung + Hochgradig variabler Fallback
   const getAirlineColor = (flightNum) => {
-    if (!flightNum || flightNum.trim().length === 0) {
-      return isDarkMode ? '#60a5fa' : '#1e3a8a';
-    }
-    
-    // Extrahiere die ersten 2 Zeichen (z.B. "LH", "SQ", "K+")
+    if (!flightNum || flightNum.trim().length === 0) return isDarkMode ? '#60a5fa' : '#1e3a8a';
     const cleanStr = flightNum.toUpperCase().replace(/\s+/g, '');
-    const prefix = cleanStr.slice(0, 2);
-
-    // FIX: Feste, klar unterscheidbare Pastellfarben für deine Haupt-Airlines
-    const fixedColors = {
-      'LH': isDarkMode ? '#f87171' : '#dc2626', // Kräftiges Pastell-Rot
-      'SQ': isDarkMode ? '#34d399' : '#059669', // Kräftiges Pastell-Grün
-      'AI': isDarkMode ? '#60a5fa' : '#2563eb', // Schönes Pastell-Blau
-      'K+': isDarkMode ? '#c084fc' : '#9333ea', // Sattes Pastell-Lila
-      'DE': isDarkMode ? '#fbbf24' : '#d97706', // Pastell-Orange/Gelb
-      'EW': isDarkMode ? '#f472b6' : '#db2777', // Pastell-Pink
-    };
-
-    // Wenn der Präfix fest definiert ist, nimm die Farbe direkt
-    if (fixedColors[prefix]) {
-      return fixedColors[prefix];
-    }
-
-    // FALLBACK für alle anderen Airlines: Generiert weit gestreute Hues
+    const match = cleanStr.match(/^[A-Z+|]+/);
+    const prefix = match ? match[0] : cleanStr.slice(0, 2);
+    const mode = isDarkMode ? 'dark' : 'light';
+    if (AIRLINE_COLORS[mode] && AIRLINE_COLORS[mode][prefix]) return AIRLINE_COLORS[mode][prefix];
     let hash = 0;
-    for (let i = 0; i < prefix.length; i++) {
-      // Nutze Primzahlen zur maximalen Streuung naheliegender Buchstaben
-      hash = prefix.charCodeAt(i) + ((hash << 7) - hash);
-    }
-
-    // Berechne den Farbkreis-Faktor (0 - 360 Grad)
-    const hue = Math.abs(hash * 139) % 360; 
-    const saturation = isDarkMode ? '85%' : '75%';
-    const lightness = isDarkMode ? '65%' : '42%'; 
-
-    return `hsl(${hue}, ${saturation}, ${lightness})`;
+    for (let i = 0; i < prefix.length; i++) hash = prefix.charCodeAt(i) + ((hash << 5) - hash);
+    return `hsl(${Math.abs(hash) % 360}, ${isDarkMode ? '85%' : '70%'}, ${isDarkMode ? '65%' : '40%'})`;
   };
 
-  // Backup in die Zwischenablage kopieren
+  const formatFormatDate = (text, nextRef) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+    let formatted = cleaned;
+    if (cleaned.length > 2 && cleaned.length <= 4) formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
+    else if (cleaned.length > 4) formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2, 4)}.${cleaned.slice(4, 8)}`;
+    if (cleaned.length === 8 && nextRef) nextRef.current?.focus();
+    return formatted;
+  };
+
+  const formatTimeInput = (text, nextRef) => {
+    const cleaned = text.replace(/[^0-9]/g, '');
+    let formatted = cleaned;
+    if (cleaned.length > 2) formatted = `${cleaned.slice(0, 2)}:${cleaned.slice(2, 4)}`;
+    if (cleaned.length === 4 && nextRef) nextRef.current?.focus();
+    return formatted;
+  };
+
+  // ==========================================
+  // BACKUP LOGIKEN
+  // ==========================================
   const handleExportBackup = () => {
-    if (flights.length === 0) {
-      Alert.alert("Backup", "Keine Flüge zum Sichern vorhanden.");
+    if (flights.length === 0 && schedules.length === 0) {
+      Alert.alert("Backup", "Keine Daten zum Sichern vorhanden.");
       return;
     }
     try {
-      const backupData = JSON.stringify(flights);
-      Clipboard.setString(backupData);
-      Alert.alert("Erfolgreich", "Backup-Text wurde in die Zwischenablage kopiert!");
+      const allData = { flights, schedules };
+      Clipboard.setString(JSON.stringify(allData));
+      Alert.alert("Erfolgreich", "Komplett-Backup in die Zwischenablage kopiert!");
     } catch (error) {
       Alert.alert("Fehler", "Kopieren fehlgeschlagen.");
     }
-  };
-
-  // Backup aus der Zwischenablage einlesen
-  const handleImportBackup = () => {
-    setBackupInputText('');
-    setBackupModalVisible(true);
   };
 
   const saveImportedBackup = () => {
@@ -142,103 +161,48 @@ export default function App() {
     }
     try {
       const parsed = JSON.parse(backupInputText.trim());
-      if (Array.isArray(parsed)) {
-        saveData(parsed);
+      if (parsed.flights || parsed.schedules) {
+        if (parsed.flights) setFlights(parsed.flights);
+        if (parsed.schedules) setSchedules(parsed.schedules);
         setBackupModalVisible(false);
-        Alert.alert("Erfolgreich", `${parsed.length} Flüge wurden erfolgreich importiert!`);
+        Alert.alert("Erfolgreich", "Daten wurden erfolgreich geladen!");
+      } else if (Array.isArray(parsed)) {
+        setFlights(parsed);
+        setBackupModalVisible(false);
+        Alert.alert("Erfolgreich", "Ad-Hoc Flüge importiert!");
       } else {
         Alert.alert("Fehler", "Ungültiges Backup-Format.");
       }
     } catch (e) {
-      Alert.alert("Fehler", "Der eingegebene Text ist kein gültiges Flug-Backup.");
+      Alert.alert("Fehler", "Gefundener Text ist kein gültiges Backup.");
     }
   };
 
-  // Formatierung & Loop für das Eintragen-Datumsfeld
-  const handleDateChange = (text) => {
-    const cleaned = text.replace(/[^0-9]/g, '');
-    let formatted = cleaned;
-    if (cleaned.length > 2 && cleaned.length <= 4) {
-      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
-    } else if (cleaned.length > 4) {
-      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2, 4)}.${cleaned.slice(4, 8)}`;
-    }
-    setFlightDate(formatted);
-
-    if (cleaned.length === 8) {
-      flightNumberRef.current?.focus();
-    }
-  };
-
-  // Formatierung & Auto-Loop für die Filter-Eingabefelder
-  const handleFilterStartChange = (text) => {
-    const cleaned = text.replace(/[^0-9]/g, '');
-    let formatted = cleaned;
-    if (cleaned.length > 2 && cleaned.length <= 4) {
-      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
-    } else if (cleaned.length > 4) {
-      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2, 4)}.${cleaned.slice(4, 8)}`;
-    }
-    setFilterStart(formatted);
-
-    if (cleaned.length === 8) {
-      filterEndRef.current?.focus();
-    }
-  };
-
-  const handleFilterEndChange = (text) => {
-    const cleaned = text.replace(/[^0-9]/g, '');
-    let formatted = cleaned;
-    if (cleaned.length > 2 && cleaned.length <= 4) {
-      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
-    } else if (cleaned.length > 4) {
-      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2, 4)}.${cleaned.slice(4, 8)}`;
-    }
-    setFilterEnd(formatted);
-  };
-
-  // Flug hinzufügen oder editieren
+  // ==========================================
+  // AD-HOC LOGIKEN
+  // ==========================================
   const saveFlightForm = () => {
     if (flightDate.length !== 10 || !flightNumber) {
       Alert.alert("Fehler", "Bitte fülle mindestens Datum und Flugnummer aus.");
       return;
     }
-
     let updatedFlights;
     const finalInfo = flightInfo.trim() || "Keine Zusatzinfos"; 
-
     if (editingFlightId) {
-      updatedFlights = flights.map(flight => {
-        if (flight.id === editingFlightId) {
-          return { ...flight, date: flightDate, flightNumber, info: finalInfo };
-        }
-        return flight;
-      });
+      updatedFlights = flights.map(f => f.id === editingFlightId ? { ...f, date: flightDate, flightNumber, info: finalInfo, status: flightStatus } : f);
     } else {
-      const newFlight = {
-        id: Date.now().toString(),
-        date: flightDate,
-        flightNumber,
-        info: finalInfo,
-        timestamp: Date.now()
-      };
-      updatedFlights = [...flights, newFlight];
+      updatedFlights = [...flights, { id: Date.now().toString(), date: flightDate, flightNumber, info: finalInfo, status: flightStatus, timestamp: Date.now() }];
     }
-    
-    updatedFlights.sort((a, b) => {
-      const dateA = parseDateString(a.date).getTime();
-      const dateB = parseDateString(b.date).getTime();
-      if (dateB !== dateA) return dateB - dateA;
-      return b.timestamp - a.timestamp;
-    });
+    updatedFlights.sort((a, b) => parseDateString(b.date).getTime() - parseDateString(a.date).getTime());
+    setFlights(updatedFlights);
+    setFlightDate(''); setFlightNumber(''); setFlightInfo(''); setFlightStatus('active'); setEditingFlightId(null); setModalVisible(false);
+  };
 
-    saveData(updatedFlights);
-
-    setFlightDate('');
-    setFlightNumber('');
-    setFlightInfo('');
-    setEditingFlightId(null);
-    setModalVisible(false);
+  const confirmDeleteFlight = (flight) => {
+    Alert.alert("Eintrag löschen", `Flug ${flight.flightNumber} wirklich löschen?`, [
+      { text: "Abbrechen", style: "cancel" },
+      { text: "Löschen", onPress: () => setFlights(flights.filter(f => f.id !== flight.id)), style: "destructive" }
+    ]);
   };
 
   const startEditFlight = (flight) => {
@@ -246,48 +210,90 @@ export default function App() {
     setFlightDate(flight.date);
     setFlightNumber(flight.flightNumber);
     setFlightInfo(flight.info === "Keine Zusatzinfos" ? "" : flight.info);
+    setFlightStatus(flight.status || 'active');
     setModalVisible(true);
   };
 
-  const confirmDeleteFlight = (flight) => {
-    Alert.alert(
-      "Eintrag löschen",
-      `Möchtest du den Flug ${flight.flightNumber} wirklich löschen?`,
-      [
-        { text: "Abbrechen", style: "cancel" },
-        {
-          text: "Löschen",
-          onPress: () => {
-            const updatedFlights = flights.filter(f => f.id !== flight.id);
-            saveData(updatedFlights);
-          },
-          style: "destructive"
-        }
-      ]
-    );
-  };
-
-  // Filter-Logik
   const filteredFlights = flights.filter(flight => {
+    if (hideCompletedFlights && (flight.status === 'completed')) return false;
     const flightTime = parseDateString(flight.date).getTime();
-    if (filterStart.length === 10) {
-      const startTime = parseDateString(filterStart).getTime();
-      if (flightTime < startTime) return false;
-    }
-    if (filterEnd.length === 10) {
-      const endTime = parseDateString(filterEnd).getTime();
-      if (flightTime > endTime) return false;
-    }
-
+    if (filterStart.length === 10 && flightTime < parseDateString(filterStart).getTime()) return false;
+    if (filterEnd.length === 10 && flightTime > parseDateString(filterEnd).getTime()) return false;
     if (searchQuery.trim().length > 0) {
-      const query = searchQuery.toLowerCase();
-      const matchNumber = flight.flightNumber.toLowerCase().includes(query);
-      const matchInfo = flight.info.toLowerCase().includes(query);
-      if (!matchNumber && !matchInfo) return false;
+      const q = searchQuery.toLowerCase();
+      return flight.flightNumber.toLowerCase().includes(q) || flight.info.toLowerCase().includes(q);
     }
-
     return true;
   });
+
+  // ==========================================
+  // FLUGPLAN LOGIKEN
+  // ==========================================
+  const toggleWeekday = (dayId) => {
+    if (schedDays.includes(dayId)) setSchedDays(schedDays.filter(id => id !== dayId));
+    else setSchedDays([...schedDays, dayId].sort());
+  };
+
+  const saveScheduleForm = () => {
+    if (!schedFlightNumber || schedStartDate.length !== 10 || schedEndDate.length !== 10 || schedSTD.length !== 5 || schedSTA.length !== 5 || schedDays.length === 0) {
+      Alert.alert("Fehler", "Bitte fülle alle Pflichtfelder inklusive Wochentage aus.");
+      return;
+    }
+    const newSchedule = {
+      id: editingScheduleId || Date.now().toString(),
+      flightNumber: schedFlightNumber,
+      startDate: schedStartDate,
+      endDate: schedEndDate,
+      std: schedSTD,
+      sta: schedSTA,
+      days: schedDays,
+      status: schedStatus,
+      timestamp: Date.now()
+    };
+    let updatedSchedules = editingScheduleId ? schedules.map(s => s.id === editingScheduleId ? newSchedule : s) : [...schedules, newSchedule];
+    setSchedules(updatedSchedules);
+    setSchedFlightNumber(''); setSchedStartDate(''); setSchedEndDate('');
+    setSchedSTD(''); setSchedSTA(''); setSchedDays([]); setSchedStatus('active');
+    setEditingScheduleId(null); setScheduleModalVisible(false);
+  };
+
+  const startEditSchedule = (schedule) => {
+    setEditingScheduleId(schedule.id); setSchedFlightNumber(schedule.flightNumber);
+    setSchedStartDate(schedule.startDate); setSchedEndDate(schedule.endDate);
+    setSchedSTD(schedule.std); setSchedSTA(schedule.sta); setSchedDays(schedule.days);
+    setSchedStatus(schedule.status || 'active'); setScheduleModalVisible(true);
+  };
+
+  const confirmDeleteSchedule = (schedule) => {
+    Alert.alert("Flugplan löschen", `Flugplan für ${schedule.flightNumber} wirklich löschen?`, [
+      { text: "Abbrechen", style: "cancel" },
+      { text: "Löschen", onPress: () => setSchedules(schedules.filter(s => s.id !== schedule.id)), style: "destructive" }
+    ]);
+  };
+
+  const getProcessedSchedules = () => {
+    let result = [...schedules];
+    if (hideCompletedSchedules) result = result.filter(s => s.status !== 'completed');
+    
+    result.sort((a, b) => {
+      if (scheduleSortBy === 'flightNumber') {
+        const numA = (a.flightNumber || '').toUpperCase();
+        const numB = (b.flightNumber || '').toUpperCase();
+        return numA.localeCompare(numB);
+      } else {
+        const timeA = parseDateString(scheduleSortBy === 'startDate' ? a.startDate : a.endDate).getTime();
+        const timeB = parseDateString(scheduleSortBy === 'startDate' ? b.startDate : b.endDate).getTime();
+        return timeB - timeA; 
+      }
+    });
+    return result;
+  };
+
+  const getStatusBackgroundColor = (status) => {
+    if (status === 'partial') return isDarkMode ? '#7c2d12' : '#ffedd5';   
+    if (status === 'completed') return isDarkMode ? '#064e3b' : '#dcfce7'; 
+    return isDarkMode ? '#1e293b' : '#ffffff';                             
+  };
 
   const themeContainer = isDarkMode ? styles.darkContainer : styles.lightContainer;
   const themeCard = isDarkMode ? styles.darkCard : styles.lightCard;
@@ -300,262 +306,243 @@ export default function App() {
     <SafeAreaView style={[styles.container, themeContainer]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
       
-      {/* Header */}
       <View style={[styles.header, isDarkMode && styles.darkHeader]}>
         <Text style={styles.headerTitle}>Flugorganisation</Text>
       </View>
 
       {/* Tabs */}
       <View style={[styles.tabBar, isDarkMode && styles.darkTabBar]}>
-        <TouchableOpacity 
-          style={[styles.tabItem, activeTab === 'flights' && styles.activeTabItem]} 
-          onPress={() => setActiveTab('flights')}
-        >
-          <Text style={[styles.tabText, activeTab === 'flights' && styles.activeTabText, isDarkMode && styles.darkTabTextShared]}>Flüge</Text>
+        <TouchableOpacity style={[styles.tabItem, activeTab === 'flights' && styles.activeTabItem]} onPress={() => setActiveTab('flights')}>
+          <Text style={[styles.tabText, activeTab === 'flights' && styles.activeTabText, isDarkMode && styles.darkTabTextShared]}>Ad-Hoc-Flüge</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tabItem, activeTab === 'settings' && styles.activeTabItem]} 
-          onPress={() => setActiveTab('settings')}
-        >
+        <TouchableOpacity style={[styles.tabItem, activeTab === 'schedule' && styles.activeTabItem]} onPress={() => setActiveTab('schedule')}>
+          <Text style={[styles.tabText, activeTab === 'schedule' && styles.activeTabText, isDarkMode && styles.darkTabTextShared]}>Flugplan</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.tabItem, activeTab === 'settings' && styles.activeTabItem]} onPress={() => setActiveTab('settings')}>
           <Text style={[styles.tabText, activeTab === 'settings' && styles.activeTabText, isDarkMode && styles.darkTabTextShared]}>Einstellungen</Text>
         </TouchableOpacity>
       </View>
 
-      {/* TABS 1: FLÜGE */}
+      {/* TAB 1: AD-HOC-FLÜGE */}
       {activeTab === 'flights' && (
         <>
           <View style={[styles.filterContainer, themePanel]}>
             <TextInput 
               style={[styles.searchBar, themeInput]}
-              placeholder="Flugnummer oder Text suchen (z.B. SQ)..."
+              placeholder="Flugnummer oder Text suchen..."
               placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCapitalize="characters"
             />
-
             <Text style={[styles.filterTitle, themeText]}>Zeitraum filtern (TTMMJJJJ):</Text>
             <View style={styles.filterInputRow}>
-              <TextInput 
-                style={[styles.filterInput, themeInput]}
-                placeholder="Von"
-                placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'}
-                keyboardType="numeric"
-                maxLength={10}
-                value={filterStart}
-                onChangeText={handleFilterStartChange}
-              />
-              <TextInput 
-                ref={filterEndRef}
-                style={[styles.filterInput, themeInput]}
-                placeholder="Bis"
-                placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'}
-                keyboardType="numeric"
-                maxLength={10}
-                value={filterEnd}
-                onChangeText={handleFilterEndChange}
-              />
+              <TextInput style={[styles.filterInput, themeInput]} placeholder="Von" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={filterStart} onChangeText={(text) => setFilterStart(formatFormatDate(text, filterEndRef))} />
+              <TextInput ref={filterEndRef} style={[styles.filterInput, themeInput]} placeholder="Bis" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={filterEnd} onChangeText={(text) => setFilterEnd(formatFormatDate(text, null))} />
             </View>
-            {(filterStart.length > 0 || filterEnd.length > 0 || searchQuery.length > 0) && (
-              <TouchableOpacity 
-                style={styles.clearFilterButton}
-                onPress={() => { setFilterStart(''); setFilterEnd(''); setSearchQuery(''); }}
-              >
-                <Text style={styles.clearFilterText}>Filter komplett löschen</Text>
-              </TouchableOpacity>
-            )}
+            <View style={[styles.rowSection, { marginTop: 10 }]}>
+              <Text style={[styles.filterTitle, themeText]}>Erledigte ausblenden:</Text>
+              <Switch value={hideCompletedFlights} onValueChange={setHideCompletedFlights} trackColor={{ false: '#d1d5db', true: '#10b981' }} />
+            </View>
           </View>
 
           <ScrollView style={styles.listContainer}>
-            {filteredFlights.length === 0 ? (
-              <Text style={[styles.emptyText, themeSubText]}>Keine Flüge gefunden.</Text>
-            ) : (
+            {filteredFlights.length === 0 ? <Text style={[styles.emptyText, themeSubText]}>Keine Flüge gefunden.</Text> : (
               filteredFlights.map((item) => {
                 const airlineColor = getAirlineColor(item.flightNumber);
-
+                const cardBgColor = getStatusBackgroundColor(item.status || 'active');
                 return (
-                  <TouchableOpacity 
-                    key={item.id} 
-                    style={[styles.flightCard, themeCard, { borderLeftColor: airlineColor }]}
-                    onPress={() => startEditFlight(item)}
-                    activeOpacity={0.7}
-                  >
+                  <TouchableOpacity key={item.id} style={[styles.flightCard, themeCard, { borderLeftColor: airlineColor, backgroundColor: cardBgColor }]} onPress={() => startEditFlight(item)} activeOpacity={0.7}>
                     <View style={styles.cardContent}>
                       <View style={styles.cardHeaderRow}>
-                        <Text style={[styles.flightNumberText, { color: airlineColor }]}>
-                          {item.flightNumber}
-                        </Text>
+                        <Text style={[styles.flightNumberText, { color: airlineColor }]}>{item.flightNumber}</Text>
                         <Text style={[styles.flightDateText, themeSubText]}>{item.date}</Text>
                       </View>
-                      <Text style={[styles.detailText, themeText]} numberOfLines={1} elipsizeMode="tail">
-                        {item.info}
-                      </Text>
+                      <Text style={[styles.detailText, themeText]}>{item.info}</Text>
                     </View>
-                    
-                    <TouchableOpacity 
-                      style={styles.miniDeleteButton} 
-                      onPress={() => confirmDeleteFlight(item)}
-                    >
-                      <Text style={styles.miniDeleteButtonText}>×</Text>
-                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.miniDeleteButton} onPress={() => confirmDeleteFlight(item)}><Text style={styles.miniDeleteButtonText}>×</Text></TouchableOpacity>
                   </TouchableOpacity>
                 );
               })
             )}
           </ScrollView>
-
-          <TouchableOpacity 
-            style={[styles.fab, isDarkMode && styles.darkFab]} 
-            onPress={() => {
-              setEditingFlightId(null);
-              setModalVisible(true);
-            }}
-          >
-            <Text style={styles.fabText}>+</Text>
-          </TouchableOpacity>
+          <TouchableOpacity style={[styles.fab, isDarkMode && styles.darkFab]} onPress={() => { setEditingFlightId(null); setFlightStatus('active'); setModalVisible(true); }}><Text style={styles.fabText}>+</Text></TouchableOpacity>
         </>
       )}
 
-      {/* TAB 2: EINSTELLUNGEN */}
+      {/* TAB 2: FLUGPLAN */}
+      {activeTab === 'schedule' && (
+        <>
+          <View style={[styles.filterContainer, themePanel, { paddingBottom: 12 }]}>
+            <View style={styles.rowSection}>
+              <Text style={[styles.filterTitle, themeText, { marginBottom: 0 }]}>Sortieren nach:</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1 }}>
+                <TouchableOpacity style={[styles.sortBadge, scheduleSortBy === 'startDate' && styles.sortBadgeActive]} onPress={() => setScheduleSortBy('startDate')}>
+                  <Text style={[styles.sortBadgeText, scheduleSortBy === 'startDate' && styles.sortBadgeTextActive]}>Startdatum</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.sortBadge, scheduleSortBy === 'endDate' && styles.sortBadgeActive]} onPress={() => setScheduleSortBy('endDate')}>
+                  <Text style={[styles.sortBadgeText, scheduleSortBy === 'endDate' && styles.sortBadgeTextActive]}>Enddatum</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.sortBadge, scheduleSortBy === 'flightNumber' && styles.sortBadgeActive]} onPress={() => setScheduleSortBy('flightNumber')}>
+                  <Text style={[styles.sortBadgeText, scheduleSortBy === 'flightNumber' && styles.sortBadgeTextActive]}>Flug</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={[styles.rowSection, { marginTop: 10 }]}>
+              <Text style={[styles.filterTitle, themeText]}>Erledigte ausblenden:</Text>
+              <Switch value={hideCompletedSchedules} onValueChange={setHideCompletedSchedules} trackColor={{ false: '#d1d5db', true: '#10b981' }} />
+            </View>
+          </View>
+
+          <ScrollView style={styles.listContainer}>
+            {getProcessedSchedules().length === 0 ? (
+              <Text style={[styles.emptyText, themeSubText, { marginTop: 40 }]}>Keine passenden Flugpläne gefunden.</Text>
+            ) : (
+              getProcessedSchedules().map((item) => {
+                const airlineColor = getAirlineColor(item.flightNumber);
+                const cardBgColor = getStatusBackgroundColor(item.status);
+                return (
+                  <TouchableOpacity 
+                    key={item.id} 
+                    style={[styles.flightCard, themeCard, { borderLeftColor: airlineColor, backgroundColor: cardBgColor }]} 
+                    onPress={() => startEditSchedule(item)} 
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.cardContent}>
+                      <View style={styles.cardHeaderRow}>
+                        <Text style={[styles.flightNumberText, { color: airlineColor }]}>{item.flightNumber}</Text>
+                        <Text style={[styles.timeTextDisplay, themeText]}>{item.std} → {item.sta}</Text>
+                      </View>
+                      <View style={styles.cardHeaderRow}>
+                        <Text style={[styles.detailText, themeSubText, { fontSize: 12, flex: 1 }]}>{item.startDate} - {item.endDate}</Text>
+                        <View style={styles.daysWrapper}>
+                          <Text style={[styles.weeksDisplay, themeText, { fontWeight: 'bold' }]}>Tage: {item.days.join('.')}</Text>
+                        </View>
+                      </View>
+                    </View>
+                    <TouchableOpacity style={styles.miniDeleteButton} onPress={() => confirmDeleteSchedule(item)}><Text style={styles.miniDeleteButtonText}>×</Text></TouchableOpacity>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </ScrollView>
+          <TouchableOpacity style={[styles.fab, isDarkMode && styles.darkFab]} onPress={() => { setEditingScheduleId(null); setScheduleModalVisible(true); }}><Text style={styles.fabText}>+</Text></TouchableOpacity>
+        </>
+      )}
+
+      {/* TAB 3: EINSTELLUNGEN */}
       {activeTab === 'settings' && (
         <ScrollView style={styles.settingsContainer}>
           <View style={[styles.settingsSection, themePanel]}>
             <Text style={[styles.sectionTitle, themeText]}>Entwicklerinformationen</Text>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, themeSubText]}>Entwickler:</Text>
-              <Text style={[styles.infoValue, themeText]}>Özgür Cetin</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, themeSubText]}>E-Mail:</Text>
-              <Text style={[styles.infoValue, themeText, styles.emailText]}>ozgur.cetin@web.de</Text>
-            </View>
+            <View style={styles.infoRow}><Text style={[styles.infoLabel, themeSubText]}>Entwickler:</Text><Text style={[styles.infoValue, themeText]}>Özgür Cetin</Text></View>
+            <View style={styles.infoRow}><Text style={[styles.infoLabel, themeSubText]}>E-Mail:</Text><Text style={[styles.infoValue, themeText, styles.emailText]}>ozgur.cetin@web.de</Text></View>
           </View>
 
           <View style={[styles.settingsSection, styles.rowSection, themePanel]}>
-            <View>
-              <Text style={[styles.sectionTitle, themeText, { marginBottom: 2 }]}>Darkmodus</Text>
-              <Text style={[styles.infoLabel, themeSubText]}>Dunkles Design aktivieren</Text>
-            </View>
-            <Switch 
-              value={isDarkMode} 
-              onValueChange={setIsDarkMode}
-              trackColor={{ false: '#d1d5db', true: '#3b82f6' }}
-              thumbColor={isDarkMode ? '#ffffff' : '#f3f4f6'}
-            />
+            <View><Text style={[styles.sectionTitle, themeText, { marginBottom: 2 }]}>Darkmodus</Text><Text style={[styles.infoLabel, themeSubText]}>Dunkles Design aktivieren</Text></View>
+            <Switch value={isDarkMode} onValueChange={setIsDarkMode} trackColor={{ false: '#d1d5db', true: '#3b82f6' }} />
           </View>
 
           <View style={[styles.settingsSection, themePanel]}>
             <Text style={[styles.sectionTitle, themeText]}>Backup & Datensicherung</Text>
-            <Text style={[styles.infoLabel, themeSubText, { marginBottom: 12 }]}>
-              Kopiere deine Daten als Text in die Zwischenablage oder füge ein altes Backup ein.
-            </Text>
             <View style={styles.backupButtonRow}>
-              <TouchableOpacity style={[styles.backupButton, styles.exportBtn]} onPress={handleExportBackup}>
-                <Text style={styles.backupButtonText}>In Zwischenablage kopieren</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.backupButton, styles.importBtn]} onPress={handleImportBackup}>
-                <Text style={[styles.backupButtonText, { color: '#4b5563' }]}>Aus Zwischenablage laden</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={[styles.backupButton, styles.exportBtn]} onPress={handleExportBackup}><Text style={styles.backupButtonText}>Backup kopieren</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.backupButton, styles.importBtn]} onPress={() => { setBackupInputText(''); setBackupModalVisible(true); }}><Text style={[styles.backupButtonText, { color: '#4b5563' }]}>Backup laden</Text></TouchableOpacity>
             </View>
           </View>
         </ScrollView>
       )}
 
-      {/* Haupt-Modal (Eintragen / Bearbeiten) */}
+      {/* MODAL: AD-HOC FLÜGE */}
       <Modal animationType="slide" transparent={true} visible={modalVisible}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, isDarkMode ? styles.darkPanel : styles.lightPanel]}>
-            <Text style={[styles.modalTitle, isDarkMode ? styles.darkText : { color: '#1e3a8a' }]}>
-              {editingFlightId ? "Flug bearbeiten" : "Neuen Flug eintragen"}
-            </Text>
-
+            <Text style={[styles.modalTitle, themeText]}>{editingFlightId ? "Flug bearbeiten" : "Neuen Ad-Hoc Flug eintragen"}</Text>
             <Text style={[styles.inputLabel, themeText]}>Datum (TTMMJJJJ):</Text>
-            <TextInput 
-              style={[styles.input, themeInput]} 
-              placeholder="z.B. 20062026" 
-              placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'}
-              keyboardType="numeric"
-              maxLength={10}
-              value={flightDate}
-              onChangeText={handleDateChange}
-            />
-
+            <TextInput style={[styles.input, themeInput]} placeholder="z.B. 20062026" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={flightDate} onChangeText={(text) => setFlightDate(formatFormatDate(text, flightNumberRef))} />
             <Text style={[styles.inputLabel, themeText]}>Flugnummer:</Text>
-            <TextInput 
-              ref={flightNumberRef}
-              style={[styles.input, themeInput]} 
-              placeholder="z.B. LH456" 
-              placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'}
-              autoCapitalize="characters"
-              value={flightNumber}
-              onChangeText={setFlightNumber}
-              returnKeyType="next"
-              onSubmitEditing={() => flightInfoRef.current?.focus()}
-            />
-
-            <Text style={[styles.inputLabel, themeText]}>Zusatz-Infos (Optional):</Text>
-            <TextInput 
-              ref={flightInfoRef}
-              style={[styles.input, themeInput]} 
-              placeholder="Kein Zwang - z.B. Gate B22" 
-              placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'}
-              value={flightInfo}
-              onChangeText={setFlightInfo}
-              returnKeyType="done"
-              onSubmitEditing={saveFlightForm}
-            />
+            <TextInput ref={flightNumberRef} style={[styles.input, themeInput]} placeholder="z.B. LH456" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} autoCapitalize="characters" value={flightNumber} onChangeText={setFlightNumber} onSubmitEditing={() => flightInfoRef.current?.focus()} />
+            <Text style={[styles.inputLabel, themeText]}>Infos:</Text>
+            <TextInput ref={flightInfoRef} style={[styles.input, themeInput]} placeholder="Optional" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} value={flightInfo} onChangeText={setFlightInfo} />
+            
+            <Text style={[styles.inputLabel, themeText, { marginTop: 8 }]}>Flug Status:</Text>
+            <View style={styles.statusRow}>
+              <TouchableOpacity style={[styles.statusBtn, flightStatus === 'active' && styles.statusBtnActiveActive]} onPress={() => setFlightStatus('active')}><Text style={[styles.statusBtnText, flightStatus === 'active' && styles.statusBtnTextActive]}>Aktiv</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.statusBtn, styles.statusBtnPartial, flightStatus === 'partial' && styles.statusBtnActivePartial]} onPress={() => setFlightStatus('partial')}><Text style={[styles.statusBtnText, flightStatus === 'partial' && styles.statusBtnTextActive]}>Teilweise</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.statusBtn, styles.statusBtnCompleted, flightStatus === 'completed' && styles.statusBtnActiveCompleted]} onPress={() => setFlightStatus('completed')}><Text style={[styles.statusBtnText, flightStatus === 'completed' && styles.statusBtnTextActive]}>Erledigt</Text></TouchableOpacity>
+            </View>
 
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.button, styles.buttonCancel, isDarkMode && styles.darkCancelBtn]} 
-                onPress={() => {
-                  setModalVisible(false);
-                  setFlightDate('');
-                  setFlightNumber('');
-                  setFlightInfo('');
-                  setEditingFlightId(null);
-                }}
-              >
-                <Text style={[styles.buttonTextCancel, isDarkMode && styles.darkText]}>Abbrechen</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={[styles.button, styles.buttonSave, isDarkMode && styles.darkFab]} onPress={saveFlightForm}>
-                <Text style={styles.buttonTextSave}>Speichern</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.buttonCancel} onPress={() => setModalVisible(false)}><Text>Abbrechen</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.buttonSave, isDarkMode && styles.darkFab]} onPress={saveFlightForm}><Text style={{color:'#fff'}}>Speichern</Text></TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Backup-Import Modal */}
+      {/* MODAL: FLUGPLAN */}
+      <Modal animationType="slide" transparent={true} visible={scheduleModalVisible}>
+        <View style={styles.modalOverlay}>
+          <ScrollView contentContainerStyle={{flexGrow: 1, justifyContent: 'center', alignItems: 'center', width: '100%'}}>
+            <View style={[styles.modalContent, isDarkMode ? styles.darkPanel : styles.lightPanel]}>
+              <Text style={[styles.modalTitle, themeText]}>{editingScheduleId ? "Flugplan bearbeiten" : "Neuen Flugplan erstellen"}</Text>
+              <Text style={[styles.inputLabel, themeText]}>Flugnummer:</Text>
+              <TextInput style={[styles.input, themeInput]} placeholder="z.B. SQ326" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} autoCapitalize="characters" value={schedFlightNumber} onChangeText={setSchedFlightNumber} onSubmitEditing={() => schedStartDateRef.current?.focus()} />
+              <Text style={[styles.inputLabel, themeText]}>Startdatum (TTMMJJJJ):</Text>
+              <TextInput ref={schedStartDateRef} style={[styles.input, themeInput]} placeholder="z.B. 01042026" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={schedStartDate} onChangeText={(text) => setSchedStartDate(formatFormatDate(text, schedEndDateRef))} />
+              <Text style={[styles.inputLabel, themeText]}>Enddatum (TTMMJJJJ):</Text>
+              <TextInput ref={schedEndDateRef} style={[styles.input, themeInput]} placeholder="z.B. 25102026" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={schedEndDate} onChangeText={(text) => setSchedEndDate(formatFormatDate(text, schedSTARef))} />
+              
+              {/* POSITIONEN GETAUSCHT: STA JETZT RECHTS VOR STD LINKS */}
+              <View style={styles.filterInputRow}>
+                <View style={{ width: '48%' }}>
+                  <Text style={[styles.inputLabel, themeText]}>STA (Ankunft HHMM):</Text>
+                  <TextInput ref={schedSTARef} style={[styles.input, themeInput, {textAlign: 'center'}]} placeholder="1845" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={5} value={schedSTA} onChangeText={(text) => setSchedSTA(formatTimeInput(text, schedSTDRef))} />
+                </View>
+                <View style={{ width: '48%' }}>
+                  <Text style={[styles.inputLabel, themeText]}>STD (Abflug HHMM):</Text>
+                  <TextInput ref={schedSTDRef} style={[styles.input, themeInput, {textAlign: 'center'}]} placeholder="1230" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={5} value={schedSTD} onChangeText={(text) => setSchedSTD(formatTimeInput(text, null))} />
+                </View>
+              </View>
+
+              <Text style={[styles.inputLabel, themeText, { marginTop: 12, marginBottom: 6 }]}>Geplante Wochentage (1-7):</Text>
+              <View style={styles.weekdayRow}>
+                {WEEKDAYS.map((day) => {
+                  const isSelected = schedDays.includes(day.id);
+                  return (
+                    <TouchableOpacity key={day.id} style={[styles.dayButton, isSelected && styles.dayButtonSelected]} onPress={() => toggleWeekday(day.id)}>
+                      <Text style={[styles.dayButtonText, isSelected && styles.dayButtonTextSelected]}>{day.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={[styles.inputLabel, themeText, { marginTop: 8 }]}>Flugplan Status:</Text>
+              <View style={styles.statusRow}>
+                <TouchableOpacity style={[styles.statusBtn, schedStatus === 'active' && styles.statusBtnActiveActive]} onPress={() => setSchedStatus('active')}><Text style={[styles.statusBtnText, schedStatus === 'active' && styles.statusBtnTextActive]}>Aktiv</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.statusBtn, styles.statusBtnPartial, schedStatus === 'partial' && styles.statusBtnActivePartial]} onPress={() => setSchedStatus('partial')}><Text style={[styles.statusBtnText, schedStatus === 'partial' && styles.statusBtnTextActive]}>Teilweise</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.statusBtn, styles.statusBtnCompleted, schedStatus === 'completed' && styles.statusBtnActiveCompleted]} onPress={() => setSchedStatus('completed')}><Text style={[styles.statusBtnText, schedStatus === 'completed' && styles.statusBtnTextActive]}>Erledigt</Text></TouchableOpacity>
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.buttonCancel} onPress={() => setScheduleModalVisible(false)}><Text>Abbrechen</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.buttonSave, isDarkMode && styles.darkFab]} onPress={saveScheduleForm}><Text style={{ color: '#ffffff', fontWeight: '600' }}>Speichern</Text></TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* BACKUP MODAL */}
       <Modal animationType="fade" transparent={true} visible={backupModalVisible}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, isDarkMode ? styles.darkPanel : styles.lightPanel]}>
             <Text style={[styles.modalTitle, themeText]}>Backup einfügen</Text>
-            <Text style={[styles.inputLabel, themeSubText, { marginBottom: 8 }]}>
-              Halte das Textfeld gedrückt, um den kopierten Backup-Code einzufügen:
-            </Text>
-            <TextInput
-              style={[styles.input, themeInput, { height: 100, textAlignVertical: 'top' }]}
-              placeholder="Hier den Text gedrückt halten & einfügen..."
-              placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'}
-              multiline={true}
-              value={backupInputText}
-              onChangeText={setBackupInputText}
-            />
+            <TextInput style={[styles.input, themeInput, { height: 100, textAlignVertical: 'top' }]} placeholder="Hier Backup-Text einfügen..." placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} multiline={true} value={backupInputText} onChangeText={setBackupInputText} />
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.button, styles.buttonCancel, isDarkMode && styles.darkCancelBtn]} 
-                onPress={() => setBackupModalVisible(false)}
-              >
-                <Text style={[styles.buttonTextCancel, isDarkMode && styles.darkText]}>Abbrechen</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.button, styles.buttonSave, isDarkMode && styles.darkFab]} 
-                onPress={saveImportedBackup}
-              >
-                <Text style={styles.buttonTextSave}>Wiederherstellen</Text>
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.buttonCancel} onPress={() => setBackupModalVisible(false)}><Text>Abbrechen</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.buttonSave, isDarkMode && styles.darkFab]} onPress={saveImportedBackup}><Text style={{ color: '#ffffff', fontWeight: '600' }}>Laden</Text></TouchableOpacity>
             </View>
           </View>
         </View>
@@ -569,7 +556,7 @@ const styles = StyleSheet.create({
   lightContainer: { backgroundColor: '#f4f5f7' },
   darkContainer: { backgroundColor: '#0f172a' },
   lightPanel: { backgroundColor: '#ffffff' },
-  darkPanel: { backgroundColor: '#1e293b', borderBottomColor: '#334155' },
+  darkPanel: { backgroundColor: '#1e293b' },
   lightCard: { backgroundColor: '#ffffff' },
   darkCard: { backgroundColor: '#1e293b' },
   lightText: { color: '#1f2937' },
@@ -588,30 +575,47 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
   activeTabText: { color: '#3b82f6' },
   darkTabTextShared: { color: '#94a3b8' },
-  filterContainer: { padding: 10 },
+  filterContainer: { padding: 12 },
   searchBar: { borderWidth: 1, borderRadius: 6, paddingVertical: 6, paddingHorizontal: 10, fontSize: 14, marginBottom: 8 },
-  filterTitle: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  filterTitle: { fontSize: 13, fontWeight: '600', marginBottom: 4 },
   filterInputRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  filterInput: { width: '48%', borderWidth: 1, borderRadius: 6, paddingVertical: 6, paddingHorizontal: 10, fontSize: 13, textAlign: 'center' },
-  clearFilterButton: { marginTop: 6, alignItems: 'center' },
-  clearFilterText: { color: '#ef4444', fontSize: 12, fontWeight: '500' },
+  filterInput: { borderWidth: 1, borderRadius: 6, padding: 6, fontSize: 14, width: '48%', textAlign: 'center' },
+  rowSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sortBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#e5e7eb', marginLeft: 6, marginBottom: 4 },
+  sortBadgeActive: { backgroundColor: '#3b82f6' },
+  sortBadgeText: { fontSize: 12, color: '#4b5563', fontWeight: '500' },
+  sortBadgeTextActive: { color: '#ffffff', fontWeight: 'bold' },
   listContainer: { flex: 1, padding: 10 },
   emptyText: { textAlign: 'center', marginTop: 20, fontSize: 14 },
-  flightCard: { borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderLeftWidth: 5, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 1 },
+  flightCard: { borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderLeftWidth: 5, elevation: 1 },
   cardContent: { flex: 1, paddingRight: 10 },
-  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
-  flightNumberText: { fontSize: 15, fontWeight: 'bold', width: 90 },
-  flightDateText: { fontSize: 13, fontWeight: '500' },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  flightNumberText: { fontSize: 16, fontWeight: 'bold', width: 90 },
+  flightDateText: { fontSize: 13 },
+  timeTextDisplay: { fontSize: 14, fontWeight: '600' },
+  
+  // OPTIMIERT: Rechte Spalten-Box für absolute Ausrichtung der Tage
+  daysWrapper: { 
+    width: 120, 
+    alignItems: 'flex-end',
+    justifyContent: 'center'
+  },
+  
+  // OPTIMIERT: Text ist jetzt immer exakt rechtsbündig ausgerichtet
+  weeksDisplay: { 
+    fontSize: 13,
+    textAlign: 'right'
+  },
+  
   detailText: { fontSize: 13 },
-  miniDeleteButton: { padding: 6, justifyContent: 'center', alignItems: 'center' },
-  miniDeleteButtonText: { fontSize: 22, color: '#9ca3af', fontWeight: '300', lineHeight: 22 },
+  miniDeleteButton: { padding: 6 },
+  miniDeleteButtonText: { fontSize: 22, color: '#9ca3af', fontWeight: '300' },
   fab: { position: 'absolute', right: 16, bottom: 16, backgroundColor: '#1e3a8a', width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', elevation: 4 },
   darkFab: { backgroundColor: '#3b82f6' },
   fabText: { color: '#ffffff', fontSize: 26, fontWeight: '300' },
   settingsContainer: { flex: 1, padding: 12 },
-  settingsSection: { borderRadius: 8, padding: 12, marginBottom: 12, backgroundColor: '#ffffff' },
-  rowSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { fontSize: 15, fontWeight: 'bold', marginBottom: 8, color: '#3b82f6' },
+  settingsSection: { borderRadius: 8, padding: 12, marginBottom: 12 },
+  sectionTitle: { fontSize: 14, fontWeight: 'bold', marginBottom: 8 },
   infoRow: { flexDirection: 'row', paddingVertical: 4 },
   infoLabel: { width: 100, fontSize: 13 },
   infoValue: { fontSize: 13, fontWeight: '500' },
@@ -622,16 +626,24 @@ const styles = StyleSheet.create({
   importBtn: { backgroundColor: '#e5e7eb' },
   backupButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 13, textAlign: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', borderRadius: 12, padding: 16 },
+  modalContent: { width: '85%', borderRadius: 12, padding: 16, maxHeight: '90%' },
   modalTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '600', marginBottom: 2, marginTop: 6 },
+  inputLabel: { fontSize: 12, fontWeight: '600', marginBottom: 2, marginTop: 8 },
   input: { borderWidth: 1, borderRadius: 6, padding: 8, fontSize: 14 },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
-  button: { flex: 1, padding: 10, borderRadius: 6, alignItems: 'center', marginHorizontal: 4 },
-  buttonCancel: { backgroundColor: '#f3f4f6' },
-  darkCancelBtn: { backgroundColor: '#475569' },
-  buttonSave: { backgroundColor: '#1e3a8a' },
-  buttonTextCancel: { color: '#4b5563', fontWeight: '600' },
-  buttonTextSave: { color: '#ffffff', fontWeight: '600' },
+  weekdayRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, marginBottom: 10 },
+  dayButton: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: '#d1d5db', backgroundColor: '#f9fafb', justifyContent: 'center', alignItems: 'center' },
+  dayButtonSelected: { backgroundColor: '#3b82f6', borderColor: '#2563eb' },
+  dayButtonText: { fontSize: 13, fontWeight: '500', color: '#4b5563' },
+  dayButtonTextSelected: { color: '#ffffff', fontWeight: 'bold' },
+  statusRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  statusBtn: { flex: 1, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#d1d5db', alignItems: 'center', marginHorizontal: 2, backgroundColor: '#f9fafb' },
+  statusBtnActiveActive: { backgroundColor: '#3b82f6', borderColor: '#2563eb' },
+  statusBtnActivePartial: { backgroundColor: '#ea580c', borderColor: '#c2410c' },
+  statusBtnActiveCompleted: { backgroundColor: '#10b981', borderColor: '#047857' },
+  statusBtnText: { fontSize: 12, fontWeight: '500', color: '#4b5563' },
+  statusBtnTextActive: { color: '#ffffff', fontWeight: 'bold' },
+  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
+  buttonCancel: { flex: 1, padding: 10, borderRadius: 6, backgroundColor: '#f3f4f6', alignItems: 'center', marginRight: 6 },
+  buttonSave: { flex: 1, padding: 10, borderRadius: 6, backgroundColor: '#1e3a8a', alignItems: 'center', marginLeft: 6 },
 });
 
