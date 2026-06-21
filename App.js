@@ -13,7 +13,25 @@ import {
   Switch,
   Clipboard 
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Sicherer Import-Versuch ohne Terminal-Zwang
+let AsyncStorage;
+try {
+  AsyncStorage = require('@react-native-async-storage/async-storage').default;
+} catch (e) {
+  try {
+    AsyncStorage = require('react-native').AsyncStorage;
+  } catch (err) {
+    AsyncStorage = null;
+  }
+}
+
+// Fallback, falls absolut kein Speicher-Modul im System gefunden wird
+const mockStorage = {
+  getItem: async () => null,
+  setItem: async () => {},
+};
+const storage = AsyncStorage || mockStorage;
 
 // ==========================================
 // DEINE MANUELLE FARBLISTE (HIER ANPASSEN!)
@@ -103,39 +121,40 @@ export default function App() {
   const schedSTDRef = useRef(null);
   const schedSTARef = useRef(null);
 
-  // Daten beim Start der App aus dem Speicher laden
+  // ==========================================
+  // PERSISTENZ LOGIKEN (LOAD / SAVE)
+  // ==========================================
   useEffect(() => {
     loadData();
   }, []);
 
-  // Automatisch speichern, wenn sich Flüge, Pläne oder Darkmode ändern
-  useEffect(() => {
-    if (flights.length > 0 || schedules.length > 0 || isDarkMode) {
-      saveData();
-    }
-  }, [flights, schedules, isDarkMode]);
-
-  const saveData = async () => {
-    try {
-      await AsyncStorage.setItem('@flights_data', JSON.stringify(flights));
-      await AsyncStorage.setItem('@schedules_data', JSON.stringify(schedules));
-      await AsyncStorage.setItem('@darkmode_data', JSON.stringify(isDarkMode));
-    } catch (error) {
-      console.error("Fehler beim Speichern der Daten", error);
-    }
-  };
-
   const loadData = async () => {
     try {
-      const storedFlights = await AsyncStorage.getItem('@flights_data');
-      const storedSchedules = await AsyncStorage.getItem('@schedules_data');
-      const storedDarkMode = await AsyncStorage.getItem('@darkmode_data');
+      const storedFlights = await storage.getItem('@flights_storage_key');
+      const storedSchedules = await storage.getItem('@schedules_storage_key');
+      const storedDarkMode = await storage.getItem('@darkmode_storage_key');
 
       if (storedFlights !== null) setFlights(JSON.parse(storedFlights));
       if (storedSchedules !== null) setSchedules(JSON.parse(storedSchedules));
-      if (storedDarkMode !== null) setIsDarkMode(JSON.parse(storedDarkMode));
+      if (storedDarkMode !== null) setIsDarkMode(JSON.parse(storedDarkMode) === true);
     } catch (error) {
-      console.error("Fehler beim Laden der Daten", error);
+      console.log('Fehler beim Laden der Daten:', error);
+    }
+  };
+
+  const saveData = async (updatedFlights, updatedSchedules, updatedDarkMode) => {
+    try {
+      if (updatedFlights !== undefined) {
+        await storage.setItem('@flights_storage_key', JSON.stringify(updatedFlights));
+      }
+      if (updatedSchedules !== undefined) {
+        await storage.setItem('@schedules_storage_key', JSON.stringify(updatedSchedules));
+      }
+      if (updatedDarkMode !== undefined) {
+        await storage.setItem('@darkmode_storage_key', JSON.stringify(updatedDarkMode));
+      }
+    } catch (error) {
+      console.log('Fehler beim Speichern der Daten:', error);
     }
   };
 
@@ -191,7 +210,7 @@ export default function App() {
     }
   };
 
-  const saveImportedBackup = async () => {
+  const saveImportedBackup = () => {
     if (!backupInputText.trim()) {
       Alert.alert("Fehler", "Bitte füge zuerst den Backup-Text ein.");
       return;
@@ -199,12 +218,19 @@ export default function App() {
     try {
       const parsed = JSON.parse(backupInputText.trim());
       if (parsed.flights || parsed.schedules) {
-        if (parsed.flights) setFlights(parsed.flights);
-        if (parsed.schedules) setSchedules(parsed.schedules);
+        if (parsed.flights) {
+          setFlights(parsed.flights);
+          saveData(parsed.flights, undefined, undefined);
+        }
+        if (parsed.schedules) {
+          setSchedules(parsed.schedules);
+          saveData(undefined, parsed.schedules, undefined);
+        }
         setBackupModalVisible(false);
         Alert.alert("Erfolgreich", "Daten wurden erfolgreich geladen!");
       } else if (Array.isArray(parsed)) {
         setFlights(parsed);
+        saveData(parsed, undefined, undefined);
         setBackupModalVisible(false);
         Alert.alert("Erfolgreich", "Ad-Hoc Flüge importiert!");
       } else {
@@ -232,6 +258,7 @@ export default function App() {
     }
     updatedFlights.sort((a, b) => parseDateString(b.date).getTime() - parseDateString(a.date).getTime());
     setFlights(updatedFlights);
+    saveData(updatedFlights, undefined, undefined);
     setFlightDate(''); setFlightNumber(''); setFlightInfo(''); setFlightStatus('active'); setEditingFlightId(null); setModalVisible(false);
   };
 
@@ -241,7 +268,7 @@ export default function App() {
       { text: "Löschen", onPress: () => {
           const updated = flights.filter(f => f.id !== flight.id);
           setFlights(updated);
-          if(updated.length === 0) AsyncStorage.setItem('@flights_data', JSON.stringify([]));
+          saveData(updated, undefined, undefined);
         }, style: "destructive" }
     ]);
   };
@@ -293,6 +320,7 @@ export default function App() {
     };
     let updatedSchedules = editingScheduleId ? schedules.map(s => s.id === editingScheduleId ? newSchedule : s) : [...schedules, newSchedule];
     setSchedules(updatedSchedules);
+    saveData(undefined, updatedSchedules, undefined);
     setSchedFlightNumber(''); setSchedStartDate(''); setSchedEndDate('');
     setSchedSTD(''); setSchedSTA(''); setSchedDays([]); setSchedStatus('active');
     setEditingScheduleId(null); setScheduleModalVisible(false);
@@ -311,7 +339,7 @@ export default function App() {
       { text: "Löschen", onPress: () => {
           const updated = schedules.filter(s => s.id !== schedule.id);
           setSchedules(updated);
-          if(updated.length === 0) AsyncStorage.setItem('@schedules_data', JSON.stringify([]));
+          saveData(undefined, updated, undefined);
         }, style: "destructive" }
     ]);
   };
@@ -486,7 +514,10 @@ export default function App() {
 
           <View style={[styles.settingsSection, styles.rowSection, themePanel]}>
             <View><Text style={[styles.sectionTitle, themeText, { marginBottom: 2 }]}>Darkmodus</Text><Text style={[styles.infoLabel, themeSubText]}>Dunkles Design aktivieren</Text></View>
-            <Switch value={isDarkMode} onValueChange={setIsDarkMode} trackColor={{ false: '#d1d5db', true: '#3b82f6' }} />
+            <Switch value={isDarkMode} onValueChange={(val) => {
+              setIsDarkMode(val);
+              saveData(undefined, undefined, val);
+            }} trackColor={{ false: '#d1d5db', true: '#3b82f6' }} />
           </View>
 
           <View style={[styles.settingsSection, themePanel]}>
