@@ -14,44 +14,48 @@ import {
   Clipboard 
 } from 'react-native';
 
-// Sicherer Import-Versuch ohne Terminal-Zwang mit erweitertem persistentem Web-Fallback
-let AsyncStorage;
-try {
-  AsyncStorage = require('@react-native-async-storage/async-storage').default;
-} catch (e) {
-  try {
-    AsyncStorage = require('react-native').AsyncStorage;
-  } catch (err) {
-    AsyncStorage = null;
-  }
-}
+// Sicherer nativer Import für den Produktions-Build
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Sicheres Fallback-System für Umgebungen ohne installierte NPM-Pakete (z.B. Web-Vorschauen/Browser)
+// Sicheres Fallback-System: Wenn AsyncStorage (nativ) fehlschlägt oder im Web läuft, greift localStorage
 const robustStorage = {
   getItem: async (key) => {
     try {
-      if (AsyncStorage) {
-        return await AsyncStorage.getItem(key);
+      if (AsyncStorage && typeof AsyncStorage.getItem === 'function') {
+        const value = await AsyncStorage.getItem(key);
+        if (value !== null) return value;
       }
+    } catch (e) {
+      console.log('Nativer Speicher konnte nicht gelesen werden, versuche Web-Fallback...', e);
+    }
+    
+    // Web-Fallback für Browser/Vorschau-Umgebungen
+    try {
       if (typeof window !== 'undefined' && window.localStorage) {
         return window.localStorage.getItem(key);
       }
-    } catch (e) {
-      console.log('Fehler beim Lesen:', e);
+    } catch (err) {
+      console.log('Web-Speicher konnte nicht gelesen werden:', err);
     }
     return null;
   },
   setItem: async (key, value) => {
     try {
-      if (AsyncStorage) {
+      if (AsyncStorage && typeof AsyncStorage.setItem === 'function') {
         await AsyncStorage.setItem(key, value);
         return;
       }
+    } catch (e) {
+      console.log('Nativer Speicher konnte nicht geschrieben werden, versuche Web-Fallback...', e);
+    }
+
+    // Web-Fallback für Browser/Vorschau-Umgebungen
+    try {
       if (typeof window !== 'undefined' && window.localStorage) {
         window.localStorage.setItem(key, value);
       }
-    } catch (e) {
-      console.log('Fehler beim Schreiben:', e);
+    } catch (err) {
+      console.log('Web-Speicher konnte nicht geschrieben werden:', err);
     }
   }
 };
