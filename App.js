@@ -29,22 +29,29 @@ try {
 // Sicheres Fallback-System für Umgebungen ohne installierte NPM-Pakete (z.B. Web-Vorschauen/Browser)
 const robustStorage = {
   getItem: async (key) => {
-    if (AsyncStorage) {
-      return await AsyncStorage.getItem(key);
-    }
-    // Wenn kein AsyncStorage da ist, nutzen wir das dauerhafte localStorage des Browsers/WebViews
-    if (typeof window !== 'undefined' && window.localStorage) {
-      return window.localStorage.getItem(key);
+    try {
+      if (AsyncStorage) {
+        return await AsyncStorage.getItem(key);
+      }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
+    } catch (e) {
+      console.log('Fehler beim Lesen:', e);
     }
     return null;
   },
   setItem: async (key, value) => {
-    if (AsyncStorage) {
-      await AsyncStorage.setItem(key, value);
-      return;
-    }
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(key, value);
+    try {
+      if (AsyncStorage) {
+        await AsyncStorage.setItem(key, value);
+        return;
+      }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+      }
+    } catch (e) {
+      console.log('Fehler beim Schreiben:', e);
     }
   }
 };
@@ -152,9 +159,15 @@ export default function App() {
       const storedSchedules = await storage.getItem('@schedules_storage_key');
       const storedDarkMode = await storage.getItem('@darkmode_storage_key');
 
-      if (storedFlights !== null) setFlights(JSON.parse(storedFlights));
-      if (storedSchedules !== null) setSchedules(JSON.parse(storedSchedules));
-      if (storedDarkMode !== null) setIsDarkMode(JSON.parse(storedDarkMode) === true);
+      if (storedFlights) {
+        setFlights(JSON.parse(storedFlights));
+      }
+      if (storedSchedules) {
+        setSchedules(JSON.parse(storedSchedules));
+      }
+      if (storedDarkMode !== null && storedDarkMode !== undefined) {
+        setIsDarkMode(JSON.parse(storedDarkMode) === true);
+      }
     } catch (error) {
       console.log('Fehler beim Laden der Daten:', error);
     }
@@ -162,13 +175,13 @@ export default function App() {
 
   const saveData = async (updatedFlights, updatedSchedules, updatedDarkMode) => {
     try {
-      if (updatedFlights !== undefined) {
+      if (updatedFlights !== undefined && updatedFlights !== null) {
         await storage.setItem('@flights_storage_key', JSON.stringify(updatedFlights));
       }
-      if (updatedSchedules !== undefined) {
+      if (updatedSchedules !== undefined && updatedSchedules !== null) {
         await storage.setItem('@schedules_storage_key', JSON.stringify(updatedSchedules));
       }
-      if (updatedDarkMode !== undefined) {
+      if (updatedDarkMode !== undefined && updatedDarkMode !== null) {
         await storage.setItem('@darkmode_storage_key', JSON.stringify(updatedDarkMode));
       }
     } catch (error) {
@@ -734,4 +747,3 @@ const styles = StyleSheet.create({
   buttonCancel: { flex: 1, padding: 10, borderRadius: 6, backgroundColor: '#f3f4f6', alignItems: 'center', marginRight: 6 },
   buttonSave: { flex: 1, padding: 10, borderRadius: 6, backgroundColor: '#1e3a8a', alignItems: 'center', marginLeft: 6 },
 });
-
