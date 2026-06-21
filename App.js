@@ -111,7 +111,7 @@ export default function App() {
   const schedSTARef = useRef(null);
 
   // ==========================================
-  // ROBUSTE LOCALSTORAGE LOGIK
+  // PERSISTENTE LOCALSTORAGE LOGIK
   // ==========================================
 
   // Daten beim Start laden
@@ -381,7 +381,7 @@ export default function App() {
   const themeInput = isDarkMode ? styles.darkInput : styles.lightInput;
   const themePanel = isDarkMode ? styles.darkPanel : styles.lightPanel;
 
-  // Ladebildschirm während des Lesens der Daten
+  // Ladebildschirm während des Einlesens
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, themeContainer, { justifyContent: 'center', alignItems: 'center' }]}>
