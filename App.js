@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
-  SafeAreaView, 
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  SafeAreaView,
   Modal,
   Alert,
   StatusBar,
   Switch,
-  Clipboard 
+  Clipboard
 } from 'react-native';
 
 // Trickst den Online-Compiler aus, damit er wegen fehlender Pakete nicht abbricht
@@ -31,7 +31,7 @@ const robustStorage = {
         if (value !== null) return value;
       }
     } catch (e) {}
-    
+
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         return window.localStorage.getItem(key);
@@ -62,15 +62,15 @@ const storage = robustStorage;
 // ==========================================
 const AIRLINE_COLORS = {
   light: {
-    'LH': '#dc2626',   // Lufthansa -> Rot
-    'SQ': '#059669',   // Singapore Airlines -> Grün
-    'AI': '#2563eb',   // Air India -> Blau
-    'AC': '#ea580c',   // Air Canada -> Orange
-    'ET': '#d97706',   // Ethiopian -> Gelb/Braun
-    'K+': '#9333ea',   // K+N -> Lila
-    'LA': '#db2777',   // LATAM -> Pink
-    'AH': '#4b5563',   // Air Algérie -> Grau
-    'UC': '#0d9488',   // Ladeco -> Türkis
+    'LH': '#dc2626', // Lufthansa -> Rot
+    'SQ': '#059669', // Singapore Airlines -> Grün
+    'AI': '#2563eb', // Air India -> Blau
+    'AC': '#ea580c', // Air Canada -> Orange
+    'ET': '#d97706', // Ethiopian -> Gelb/Braun
+    'K+': '#9333ea', // K+N -> Lila
+    'LA': '#db2777', // LATAM -> Pink
+    'AH': '#4b5563', // Air Algérie -> Grau
+    'UC': '#0d9488', // Ladeco -> Türkis
   },
   dark: {
     'LH': '#f87171',
@@ -108,9 +108,9 @@ export default function App() {
   const [schedules, setSchedules] = useState([]);
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState(null);
-  
+
   // Sortierungs- & Filter-States für Flugplan
-  const [scheduleSortBy, setScheduleSortBy] = useState('startDate'); 
+  const [scheduleSortBy, setScheduleSortBy] = useState('startDate');
   const [hideCompletedSchedules, setHideCompletedSchedules] = useState(false);
 
   // Formular-States für Flugplan
@@ -119,8 +119,8 @@ export default function App() {
   const [schedEndDate, setSchedEndDate] = useState('');
   const [schedSTD, setSchedSTD] = useState('');
   const [schedSTA, setSchedSTA] = useState('');
-  const [schedDays, setSchedDays] = useState([]); 
-  const [schedStatus, setSchedStatus] = useState('active'); 
+  const [schedDays, setSchedDays] = useState([]);
+  const [schedStatus, setSchedStatus] = useState('active');
 
   // Sonstige States
   const [backupModalVisible, setBackupModalVisible] = useState(false);
@@ -209,8 +209,11 @@ export default function App() {
   const formatFormatDate = (text, nextRef) => {
     const cleaned = text.replace(/[^0-9]/g, '');
     let formatted = cleaned;
-    if (cleaned.length > 2 && cleaned.length <= 4) formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
-    else if (cleaned.length > 4) formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2, 4)}.${cleaned.slice(4, 8)}`;
+    if (cleaned.length > 2 && cleaned.length <= 4) {
+      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
+    } else if (cleaned.length > 4) {
+      formatted = `${cleaned.slice(0, 2)}.${cleaned.slice(2, 4)}.${cleaned.slice(4, 8)}`;
+    }
     if (cleaned.length === 8 && nextRef) nextRef.current?.focus();
     return formatted;
   };
@@ -280,7 +283,7 @@ export default function App() {
       return;
     }
     let updatedFlights;
-    const finalInfo = flightInfo.trim() || "Keine Zusatzinfos"; 
+    const finalInfo = flightInfo.trim() || "Keine Zusatzinfos";
     if (editingFlightId) {
       updatedFlights = flights.map(f => f.id === editingFlightId ? { ...f, date: flightDate, flightNumber, info: finalInfo, status: flightStatus } : f);
     } else {
@@ -377,7 +380,7 @@ export default function App() {
   const getProcessedSchedules = () => {
     let result = [...schedules];
     if (hideCompletedSchedules) result = result.filter(s => s.status !== 'completed');
-    
+
     result.sort((a, b) => {
       if (scheduleSortBy === 'flightNumber') {
         const numA = (a.flightNumber || '').toUpperCase();
@@ -386,16 +389,16 @@ export default function App() {
       } else {
         const timeA = parseDateString(scheduleSortBy === 'startDate' ? a.startDate : a.endDate).getTime();
         const timeB = parseDateString(scheduleSortBy === 'startDate' ? b.startDate : b.endDate).getTime();
-        return timeB - timeA; 
+        return timeB - timeA;
       }
     });
     return result;
   };
 
   const getStatusBackgroundColor = (status) => {
-    if (status === 'partial') return isDarkMode ? '#7c2d12' : '#ffedd5';   
-    if (status === 'completed') return isDarkMode ? '#064e3b' : '#dcfce7'; 
-    return isDarkMode ? '#1e293b' : '#ffffff';                             
+    if (status === 'partial') return isDarkMode ? '#7c2d12' : '#ffedd5';
+    if (status === 'completed') return isDarkMode ? '#064e3b' : '#dcfce7';
+    return isDarkMode ? '#1e293b' : '#ffffff';
   };
 
   const themeContainer = isDarkMode ? styles.darkContainer : styles.lightContainer;
@@ -408,7 +411,7 @@ export default function App() {
   return (
     <SafeAreaView style={[styles.container, themeContainer]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} />
-      
+
       <View style={[styles.header, isDarkMode && styles.darkHeader]}>
         <Text style={styles.headerTitle}>Flugorganisation</Text>
       </View>
@@ -430,7 +433,7 @@ export default function App() {
       {activeTab === 'flights' && (
         <>
           <View style={[styles.filterContainer, themePanel]}>
-            <TextInput 
+            <TextInput
               style={[styles.searchBar, themeInput]}
               placeholder="Flugnummer oder Text suchen..."
               placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'}
@@ -505,10 +508,10 @@ export default function App() {
                 const airlineColor = getAirlineColor(item.flightNumber);
                 const cardBgColor = getStatusBackgroundColor(item.status);
                 return (
-                  <TouchableOpacity 
-                    key={item.id} 
-                    style={[styles.flightCard, themeCard, { borderLeftColor: airlineColor, backgroundColor: cardBgColor }]} 
-                    onPress={() => startEditSchedule(item)} 
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.flightCard, themeCard, { borderLeftColor: airlineColor, backgroundColor: cardBgColor }]}
+                    onPress={() => startEditSchedule(item)}
                     activeOpacity={0.7}
                   >
                     <View style={styles.cardContent}>
@@ -571,7 +574,7 @@ export default function App() {
             <TextInput ref={flightNumberRef} style={[styles.input, themeInput]} placeholder="z.B. LH456" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} autoCapitalize="characters" value={flightNumber} onChangeText={setFlightNumber} onSubmitEditing={() => flightInfoRef.current?.focus()} />
             <Text style={[styles.inputLabel, themeText]}>Infos:</Text>
             <TextInput ref={flightInfoRef} style={[styles.input, themeInput]} placeholder="Optional" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} value={flightInfo} onChangeText={setFlightInfo} />
-            
+
             <Text style={[styles.inputLabel, themeText, { marginTop: 8 }]}>Flug Status:</Text>
             <View style={styles.statusRow}>
               <TouchableOpacity style={[styles.statusBtn, flightStatus === 'active' && styles.statusBtnActiveActive]} onPress={() => setFlightStatus('active')}><Text style={[styles.statusBtnText, flightStatus === 'active' && styles.statusBtnTextActive]}>Aktiv</Text></TouchableOpacity>
@@ -599,7 +602,7 @@ export default function App() {
               <TextInput ref={schedStartDateRef} style={[styles.input, themeInput]} placeholder="z.B. 01042026" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={schedStartDate} onChangeText={(text) => setSchedStartDate(formatFormatDate(text, schedEndDateRef))} />
               <Text style={[styles.inputLabel, themeText]}>Enddatum (TTMMJJJJ):</Text>
               <TextInput ref={schedEndDateRef} style={[styles.input, themeInput]} placeholder="z.B. 25102026" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={schedEndDate} onChangeText={(text) => setSchedEndDate(formatFormatDate(text, schedSTARef))} />
-              
+
               <View style={styles.filterInputRow}>
                 <View style={{ width: '48%' }}>
                   <Text style={[styles.inputLabel, themeText]}>STA (Ankunft HHMM):</Text>
@@ -698,12 +701,12 @@ const styles = StyleSheet.create({
   flightNumberText: { fontSize: 16, fontWeight: 'bold', width: 90 },
   flightDateText: { fontSize: 13 },
   timeTextDisplay: { fontSize: 14, fontWeight: '600' },
-  daysWrapper: { 
-    width: 120, 
+  daysWrapper: {
+    width: 120,
     alignItems: 'flex-end',
     justifyContent: 'center'
   },
-  weeksDisplay: { 
+  weeksDisplay: {
     fontSize: 13,
     textAlign: 'right'
   },
