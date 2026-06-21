@@ -721,4 +721,3 @@ const styles = StyleSheet.create({
   buttonCancel: { flex: 1, padding: 10, borderRadius: 6, backgroundColor: '#f3f4f6', alignItems: 'center', marginRight: 6 },
   buttonSave: { flex: 1, padding: 10, borderRadius: 6, backgroundColor: '#1e3a8a', alignItems: 'center', marginLeft: 6 },
 });
-
