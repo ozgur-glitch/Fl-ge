@@ -13,23 +13,23 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ozce.fluge"
+      "bundleIdentifier": "com.oc2003.fluge"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.ozce.fluge"
+      "package": "com.oc2003.fluge"
     },
     "web": {
       "favicon": "./icon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "0362870d-808d-4feb-ba97-756da0350655"
+        "projectId": "510d4414-af8f-4570-94a4-88491198c0ba"
       }
     },
-    "owner": "ozce"
+    "owner": "oc2003"
   }
 }
