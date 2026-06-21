@@ -20,7 +20,7 @@ const STORAGE_KEY_FLIGHTS = 'flight_organizer_flights';
 const STORAGE_KEY_SCHEDULES = 'flight_organizer_schedules';
 
 // ==========================================
-// DEINE MANUELLE FARBLISTE (HIER ANPASSEN!)
+// DEINE MANUELLE FARBLISTE
 // ==========================================
 const AIRLINE_COLORS = {
   light: {
@@ -111,34 +111,41 @@ export default function App() {
   const schedSTARef = useRef(null);
 
   // ==========================================
-  // LOCALSTORAGE LOGIK (INSTALLATIONSFREI)
+  // ROBUSTE LOCALSTORAGE LOGIK
   // ==========================================
 
-  // Daten beim Start aus dem Browser-Speicher des Handys laden
+  // Daten beim Start laden
   useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const storedFlights = localStorage.getItem(STORAGE_KEY_FLIGHTS);
-        const storedSchedules = localStorage.getItem(STORAGE_KEY_SCHEDULES);
-        
-        if (storedFlights) setFlights(JSON.parse(storedFlights));
-        if (storedSchedules) setSchedules(JSON.parse(storedSchedules));
+    function loadData() {
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const storedFlights = window.localStorage.getItem(STORAGE_KEY_FLIGHTS);
+          const storedSchedules = window.localStorage.getItem(STORAGE_KEY_SCHEDULES);
+          
+          if (storedFlights) {
+            setFlights(JSON.parse(storedFlights));
+          }
+          if (storedSchedules) {
+            setSchedules(JSON.parse(storedSchedules));
+          }
+        }
+      } catch (error) {
+        console.log("Speicher konnte nicht geladen werden", error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.log("Speicher konnte nicht geladen werden", error);
-    } finally {
-      setIsLoading(false);
     }
+    loadData();
   }, []);
 
   // Helfer zum Sichern der Flüge
   const saveFlightsToStorage = (updatedFlights) => {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(STORAGE_KEY_FLIGHTS, JSON.stringify(updatedFlights));
+        window.localStorage.setItem(STORAGE_KEY_FLIGHTS, JSON.stringify(updatedFlights));
       }
     } catch (error) {
-      Alert.alert("Fehler", "Speichern fehlgeschlagen.");
+      console.log("Fehler beim Speichern der Flüge", error);
     }
   };
 
@@ -146,10 +153,10 @@ export default function App() {
   const saveSchedulesToStorage = (updatedSchedules) => {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(updatedSchedules));
+        window.localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(updatedSchedules));
       }
     } catch (error) {
-      Alert.alert("Fehler", "Speichern fehlgeschlagen.");
+      console.log("Fehler beim Speichern des Flugplans", error);
     }
   };
 
