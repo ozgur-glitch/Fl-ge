@@ -14,7 +14,7 @@ import {
   Clipboard 
 } from 'react-native';
 
-// Sicherer Import-Versuch ohne Terminal-Zwang
+// Sicherer Import-Versuch ohne Terminal-Zwang mit erweitertem persistentem Web-Fallback
 let AsyncStorage;
 try {
   AsyncStorage = require('@react-native-async-storage/async-storage').default;
@@ -26,12 +26,30 @@ try {
   }
 }
 
-// Fallback, falls absolut kein Speicher-Modul im System gefunden wird
-const mockStorage = {
-  getItem: async () => null,
-  setItem: async () => {},
+// Sicheres Fallback-System für Umgebungen ohne installierte NPM-Pakete (z.B. Web-Vorschauen/Browser)
+const robustStorage = {
+  getItem: async (key) => {
+    if (AsyncStorage) {
+      return await AsyncStorage.getItem(key);
+    }
+    // Wenn kein AsyncStorage da ist, nutzen wir das dauerhafte localStorage des Browsers/WebViews
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+    return null;
+  },
+  setItem: async (key, value) => {
+    if (AsyncStorage) {
+      await AsyncStorage.setItem(key, value);
+      return;
+    }
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  }
 };
-const storage = AsyncStorage || mockStorage;
+
+const storage = robustStorage;
 
 // ==========================================
 // DEINE MANUELLE FARBLISTE (HIER ANPASSEN!)
@@ -570,7 +588,6 @@ export default function App() {
               <Text style={[styles.inputLabel, themeText]}>Enddatum (TTMMJJJJ):</Text>
               <TextInput ref={schedEndDateRef} style={[styles.input, themeInput]} placeholder="z.B. 25102026" placeholderTextColor={isDarkMode ? '#9ca3af' : '#6b7280'} keyboardType="numeric" maxLength={10} value={schedEndDate} onChangeText={(text) => setSchedEndDate(formatFormatDate(text, schedSTARef))} />
               
-              {/* POSITIONEN GETAUSCHT: STA JETZT RECHTS VOR STD LINKS */}
               <View style={styles.filterInputRow}>
                 <View style={{ width: '48%' }}>
                   <Text style={[styles.inputLabel, themeText]}>STA (Ankunft HHMM):</Text>
