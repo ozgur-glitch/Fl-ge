@@ -13,6 +13,7 @@ import {
   Switch,
   Clipboard 
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ==========================================
 // DEINE MANUELLE FARBLISTE (HIER ANPASSEN!)
@@ -102,6 +103,42 @@ export default function App() {
   const schedSTDRef = useRef(null);
   const schedSTARef = useRef(null);
 
+  // Daten beim Start der App aus dem Speicher laden
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Automatisch speichern, wenn sich Flüge, Pläne oder Darkmode ändern
+  useEffect(() => {
+    if (flights.length > 0 || schedules.length > 0 || isDarkMode) {
+      saveData();
+    }
+  }, [flights, schedules, isDarkMode]);
+
+  const saveData = async () => {
+    try {
+      await AsyncStorage.setItem('@flights_data', JSON.stringify(flights));
+      await AsyncStorage.setItem('@schedules_data', JSON.stringify(schedules));
+      await AsyncStorage.setItem('@darkmode_data', JSON.stringify(isDarkMode));
+    } catch (error) {
+      console.error("Fehler beim Speichern der Daten", error);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      const storedFlights = await AsyncStorage.getItem('@flights_data');
+      const storedSchedules = await AsyncStorage.getItem('@schedules_data');
+      const storedDarkMode = await AsyncStorage.getItem('@darkmode_data');
+
+      if (storedFlights !== null) setFlights(JSON.parse(storedFlights));
+      if (storedSchedules !== null) setSchedules(JSON.parse(storedSchedules));
+      if (storedDarkMode !== null) setIsDarkMode(JSON.parse(storedDarkMode));
+    } catch (error) {
+      console.error("Fehler beim Laden der Daten", error);
+    }
+  };
+
   const parseDateString = (dateStr) => {
     if (!dateStr || dateStr.length !== 10) return new Date(0);
     const [day, month, year] = dateStr.split('.').map(Number);
@@ -154,7 +191,7 @@ export default function App() {
     }
   };
 
-  const saveImportedBackup = () => {
+  const saveImportedBackup = async () => {
     if (!backupInputText.trim()) {
       Alert.alert("Fehler", "Bitte füge zuerst den Backup-Text ein.");
       return;
@@ -201,7 +238,11 @@ export default function App() {
   const confirmDeleteFlight = (flight) => {
     Alert.alert("Eintrag löschen", `Flug ${flight.flightNumber} wirklich löschen?`, [
       { text: "Abbrechen", style: "cancel" },
-      { text: "Löschen", onPress: () => setFlights(flights.filter(f => f.id !== flight.id)), style: "destructive" }
+      { text: "Löschen", onPress: () => {
+          const updated = flights.filter(f => f.id !== flight.id);
+          setFlights(updated);
+          if(updated.length === 0) AsyncStorage.setItem('@flights_data', JSON.stringify([]));
+        }, style: "destructive" }
     ]);
   };
 
@@ -267,7 +308,11 @@ export default function App() {
   const confirmDeleteSchedule = (schedule) => {
     Alert.alert("Flugplan löschen", `Flugplan für ${schedule.flightNumber} wirklich löschen?`, [
       { text: "Abbrechen", style: "cancel" },
-      { text: "Löschen", onPress: () => setSchedules(schedules.filter(s => s.id !== schedule.id)), style: "destructive" }
+      { text: "Löschen", onPress: () => {
+          const updated = schedules.filter(s => s.id !== schedule.id);
+          setSchedules(updated);
+          if(updated.length === 0) AsyncStorage.setItem('@schedules_data', JSON.stringify([]));
+        }, style: "destructive" }
     ]);
   };
 
@@ -593,20 +638,15 @@ const styles = StyleSheet.create({
   flightNumberText: { fontSize: 16, fontWeight: 'bold', width: 90 },
   flightDateText: { fontSize: 13 },
   timeTextDisplay: { fontSize: 14, fontWeight: '600' },
-  
-  // OPTIMIERT: Rechte Spalten-Box für absolute Ausrichtung der Tage
   daysWrapper: { 
     width: 120, 
     alignItems: 'flex-end',
     justifyContent: 'center'
   },
-  
-  // OPTIMIERT: Text ist jetzt immer exakt rechtsbündig ausgerichtet
   weeksDisplay: { 
     fontSize: 13,
     textAlign: 'right'
   },
-  
   detailText: { fontSize: 13 },
   miniDeleteButton: { padding: 6 },
   miniDeleteButtonText: { fontSize: 22, color: '#9ca3af', fontWeight: '300' },
